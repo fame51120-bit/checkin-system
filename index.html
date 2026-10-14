@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบเช็คอินพนักงาน</title>
+<style>
+body{font-family:sans-serif;background:#111;color:#fff;text-align:center;padding:20px}
+video{width:90%;max-width:400px;border-radius:20px;border:3px solid #0f0}
+button{padding:15px 30px;font-size:18px;background:#0f0;border:none;border-radius:10px;margin:10px;font-weight:bold}
+#log{margin-top:20px;background:#222;padding:10px;border-radius:10px;text-align:left}
+</style>
+</head>
+<body>
+<h1>📸 ระบบเช็คอินสแกนหน้า</h1>
+<video id="video" autoplay playsinline></video><br>
+<button onclick="checkin()">กดเช็คอิน / เช็คเอาท์</button>
+<button onclick="clearData()" style="background:#f55">ล้างข้อมูล</button>
+<div id="status">กำลังเปิดกล้อง...</div>
+<div id="log"></div>
+<script>
+let stream;
+async function startCamera(){
+ try{stream=await navigator.mediaDevices.getUserMedia({video:true});
+ document.getElementById('video').srcObject=stream;
+ document.getElementById('status').innerText='กล้องพร้อมแล้ว พร้อมเช็คอิน';
+ }catch(e){document.getElementById('status').innerText='เปิดกล้องไม่ได้: '+e}}
+function checkin(){
+ const now=new Date();
+ const time=now.toLocaleString('th-TH');
+ const logs=JSON.parse(localStorage.getItem('logs')||'[]');
+ logs.unshift(time+' - เช็คอินสำเร็จ');
+ localStorage.setItem('logs',JSON.stringify(logs));
+ renderLog();
+ document.getElementById('status').innerText='✅ บันทึกเวลา '+time+' สำเร็จ';
+}
+function renderLog(){
+ const logs=JSON.parse(localStorage.getItem('logs')||'[]');
+ document.getElementById('log').innerHTML='<h3>ประวัติการเช็คอิน</h3>'+logs.join('<br>');
+}
+function clearData(){if(confirm('ล้างหมดเลยนะ?')){localStorage.clear();renderLog();}}
+startCamera();renderLog();
+</script>
+</body>
+</html>
