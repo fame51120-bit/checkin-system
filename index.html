@@ -2,44 +2,92 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบเช็คอินพนักงาน</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เช็คอิน + พิกัด + รูป</title>
 <style>
-body{font-family:sans-serif;background:#111;color:#fff;text-align:center;padding:20px}
-video{width:90%;max-width:400px;border-radius:20px;border:3px solid #0f0}
-button{padding:15px 30px;font-size:18px;background:#0f0;border:none;border-radius:10px;margin:10px;font-weight:bold}
-#log{margin-top:20px;background:#222;padding:10px;border-radius:10px;text-align:left}
+body{font-family:sans-serif;background:#eef2f7;padding:15px}
+.card{max-width:500px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 10px #0001}
+video{width:100%;border-radius:12px;background:#000}
+button{width:100%;padding:14px;margin-top:10px;border-radius:10px;border:none;font-weight:bold;font-size:18px;cursor:pointer}
+.btn-check{background:#198754;color:#fff}
+#status{text-align:center;margin-top:10px;color:#555}
+.item{border-left:4px solid #198754;background:#f8f9fa;padding:10px;margin-top:12px;border-radius:8px;font-size:14px}
+.item img{width:100%;border-radius:8px;margin-top:6px}
 </style>
 </head>
 <body>
-<h1>📸 ระบบเช็คอินสแกนหน้า</h1>
-<video id="video" autoplay playsinline></video><br>
-<button onclick="checkin()">กดเช็คอิน / เช็คเอาท์</button>
-<button onclick="clearData()" style="background:#f55">ล้างข้อมูล</button>
+<div class="card">
+<h2 style="text-align:center">📍 เช็คอินรู้ที่อยู่</h2>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" style="display:none"></canvas>
+<button class="btn-check" onclick="checkIn()">📸 กดเช็คอิน + ถ่ายรูป + จับพิกัด</button>
 <div id="status">กำลังเปิดกล้อง...</div>
-<div id="log"></div>
+<h3>ประวัติ</h3>
+<div id="list">ยังไม่มีการเช็คอิน</div>
+</div>
 <script>
-let stream;
-async function startCamera(){
- try{stream=await navigator.mediaDevices.getUserMedia({video:true});
- document.getElementById('video').srcObject=stream;
- document.getElementById('status').innerText='กล้องพร้อมแล้ว พร้อมเช็คอิน';
- }catch(e){document.getElementById('status').innerText='เปิดกล้องไม่ได้: '+e}}
-function checkin(){
- const now=new Date();
- const time=now.toLocaleString('th-TH');
- const logs=JSON.parse(localStorage.getItem('logs')||'[]');
- logs.unshift(time+' - เช็คอินสำเร็จ');
- localStorage.setItem('logs',JSON.stringify(logs));
- renderLog();
- document.getElementById('status').innerText='✅ บันทึกเวลา '+time+' สำเร็จ';
+let s;
+async function init(){
+ try{
+  s=await navigator.mediaDevices.getUserMedia({video:true});
+  document.getElementById("video").srcObject=s;
+  document.getElementById("status").innerText="กล้องพร้อมแล้ว หันไปถ่ายหน้างานได้เลย";
+ }catch(e){
+  document.getElementById("status").innerText="กล้องเปิดไม่ได้ แต่ยังใช้ GPS ได้";
+ }
 }
-function renderLog(){
- const logs=JSON.parse(localStorage.getItem('logs')||'[]');
- document.getElementById('log').innerHTML='<h3>ประวัติการเช็คอิน</h3>'+logs.join('<br>');
+init();
+
+function checkIn(){
+ document.getElementById("status").innerText="⏳ กำลังจับพิกัด GPS...";
+ navigator.geolocation.getCurrentPosition(pos=>{
+   save(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy);
+ },err=>{
+   document.getElementById("status").innerText="❌ จับ GPS ไม่ได้ - พี่ต้องกดอนุญาตตำแหน่งตรงรูปกุญแจด้านบนนะครับ";
+   save(null,null,null);
+ },{enableHighAccuracy:true,timeout:15000});
 }
-function clearData(){if(confirm('ล้างหมดเลยนะ?')){localStorage.clear();renderLog();}}
-startCamera();renderLog();
+
+function save(lat,lng,acc){
+ const v=document.getElementById("video");
+ const c=document.getElementById("canvas");
+ let photo=null;
+ try{
+  if(v.videoWidth>0){
+   c.width=v.videoWidth; c.height=v.videoHeight;
+   c.getContext("2d").drawImage(v,0,0);
+   photo=c.toDataURL("image/jpeg",0.6);
+  }
+ }catch(e){}
+
+ const time=new Date().toLocaleString("th-TH");
+ let locText="ไม่มีพิกัด - ไม่ได้อนุญาต";
+ let mapLink="";
+ if(lat){
+  mapLink=`https://www.google.com/maps?q=${lat},${lng}`;
+  locText=`📍 ${lat.toFixed(6)}, ${lng.toFixed(6)} (แม่น ±${Math.round(acc)}ม.)`;
+ }
+
+ let h=JSON.parse(localStorage.getItem("h")||"[]");
+ h.unshift({time,locText,mapLink,photo});
+ localStorage.setItem("h",JSON.stringify(h));
+ document.getElementById("status").innerHTML=`✅ ${time}<br>${locText}`;
+ render();
+}
+
+function render(){
+ let h=JSON.parse(localStorage.getItem("h")||"[]");
+ let list=document.getElementById("list");
+ if(h.length==0){list.innerHTML="ยังไม่มีการเช็คอิน";return;}
+ list.innerHTML="";
+ h.forEach(o=>{
+  let d=document.createElement("div");
+  d.className="item";
+  d.innerHTML=`<b>${o.time}</b><br>${o.locText}<br>`+(o.mapLink?`<a href="${o.mapLink}" target="_blank">🗺️ กดดูแผนที่</a><br>`:"")+(o.photo?`<img src="${o.photo}">`:"");
+  list.appendChild(d);
+ });
+}
+render();
 </script>
 </body>
 </html>
